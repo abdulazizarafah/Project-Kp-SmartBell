@@ -13,7 +13,7 @@ SoftwareSerial mySerial(2, 3); // RX, TX untuk DFPlayer Mini
 SoftwareSerial Bluetooth(10, 11); // RX, TX untuk Bluetooth
 
 // Jadwal waktu kegiatan untuk setiap hari (7 hari, 7 jadwal per hari)
-String schedule[7][7] = {
+char schedule[7][7][9] = {
     {"10:31:00", "11:00:00", "12:00:00", "13:00:00", "14:00:00", "15:00:00", "16:00:00"}, // Minggu
     {"10:31:00", "11:00:00", "12:00:00", "13:00:00", "14:00:00", "15:00:00", "16:00:00"}, // Senin
     {"10:31:00", "11:00:00", "12:00:00", "13:00:00", "14:00:00", "15:00:00", "16:00:00"}, // Selasa
@@ -50,7 +50,7 @@ void setup() {
   mySerial.begin(9600);
   mp3_set_serial(mySerial);
   delay(100);
-  mp3_set_volume(15); // Set volume (0~30)
+  mp3_set_volume(25); // Set volume (0~30)
   for (int i = 0; i < 3; i++) {
     tone(buzzer, 5000);
     delay(150);
@@ -88,7 +88,7 @@ void loop() {
   Serial.println(currentTime);
 
   for (int i = 0; i < 7; i++) {
-    if (strcmp(currentTime, schedule[currentDayIndex][i].c_str()) == 0) {
+    if (strcmp(currentTime, schedule[currentDayIndex][i]) == 0) {
       Serial.print("Waktu pada jadwal hari ini: ");
       Serial.print(currentDayName);
       Serial.println(schedule[currentDayIndex][i]);
@@ -102,6 +102,28 @@ void loop() {
     String receivedData = Bluetooth.readStringUntil('\n');
     Serial.println("Received data: " + receivedData);
 
+    if (receivedData.startsWith("DATE,")) {
+      // Pisahkan data tanggal dari string
+      String dateString = receivedData.substring(5, 24);
+      int day = dateString.substring(0, 2).toInt();
+      int month = dateString.substring(3, 5).toInt();
+      int year = dateString.substring(6, 10).toInt();
+      int hour = dateString.substring(11, 13).toInt();
+      int minute = dateString.substring(14, 16).toInt();
+      int second = dateString.substring(17, 19).toInt();
+
+      // Atur waktu RTC berdasarkan data tanggal yang diterima
+      rtc.adjust(DateTime(year, month, day, hour, minute, second));
+
+      // Tampilkan notifikasi di LCD
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Tanggal Diupdate");
+      lcd.setCursor(0, 1);
+      lcd.print(receivedData);
+      delay(2000);
+      lcd.clear();
+    } else {
     int startIndex = 0;
     int endIndex = receivedData.indexOf(',');
 
@@ -113,20 +135,25 @@ void loop() {
     int scheduleIndex = 0;
     endIndex = receivedData.indexOf(',', startIndex);
     while (endIndex >= 0 && scheduleIndex < 7) {
-      schedule[dayIndex][scheduleIndex] = receivedData.substring(startIndex, endIndex);
+      strncpy(schedule[dayIndex][scheduleIndex], receivedData.substring(startIndex, endIndex).c_str(), 9);
+      schedule[dayIndex][scheduleIndex][8] = '\0'; // Ensure null termination
       startIndex = endIndex + 1;
       endIndex = receivedData.indexOf(',', startIndex);
       scheduleIndex++;
     }
-    schedule[dayIndex][scheduleIndex] = receivedData.substring(startIndex);
+    strncpy(schedule[dayIndex][scheduleIndex], receivedData.substring(startIndex).c_str(), 9);
+    schedule[dayIndex][scheduleIndex][8] = '\0'; // Ensure null termination
 
     // Notifikasi di LCD
     lcd.clear();
-    lcd.setCursor(0, 0);
+    lcd.setCursor(1, 0);
+    lcd.print("Berhasil ..!!");
+    lcd.setCursor(0, 1);
     lcd.print("Jadwal diupdate");
     delay(2000);
     lcd.clear();
   }
-
+  }
   delay(1000);
 }
+
